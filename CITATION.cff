@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "Se você usar este software, cite-o como abaixo."
+title: "Simulador de Cor por Camadas: cor final de lente de contato dental e laminado a partir do preparo, do cimento e da cerâmica"
+type: software
+version: 0.1.0
+date-released: 2026-10-20
+doi: 10.6084/m9.figshare.34715211
+license: MIT
+repository-code: "https://github.com/mborille/simulador-cor-camadas"
+authors:
+  - family-names: Borille
+    given-names: Marcelo Barboza
+    orcid: "https://orcid.org/0009-0000-5422-207X"
+keywords:
+  - odontologia
+  - cor dental
+  - lentes de contato dentais
+  - laminados cerâmicos
+  - translucidez
+  - Kubelka-Munk
+  - CIEDE2000
+  - open source software
+abstract: "Estima a cor final de uma lente de contato dental ou laminado cerâmico a partir da cor do preparo, do cimento e da espessura e translucidez da cerâmica, usando o modelo de Kubelka e Munk em três bandas, e compara com a cor desejada pelo CIEDE2000. Aplicativo HTML independente com modo de calibração. Ferramenta de estudo, não validada contra espectrofotômetro."
+references:
+  - type: article
+    authors:
+      - family-names: Paravina
+        given-names: Rade D.
+    title: "Color difference thresholds in dentistry"
+    journal: "Journal of Esthetic and Restorative Dentistry"
+    year: 2015
+    volume: 27
+    issue: "Suppl 1"
+    start: S1
+    end: S9
+    doi: 10.1111/jerd.12149

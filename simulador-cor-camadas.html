@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Cor por Camadas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: foto grande à esquerda, painel de medição à direita; empilha no celular.
+   Linguagem: Apple (tipografia do sistema, superfícies agrupadas, controles segmentados, azul do sistema). */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --line: rgba(60, 60, 67, 0.16);
+  --fg: #1d1d1f;
+  --fg-dim: #6e6e73;
+  --accent: #0071e3;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(0, 113, 227, 0.1);
+  --seg-thumb: #ffffff;
+  --card-c: #8e8e93;
+  --tooth-c: #ff9f0a;
+  --ref-c: #30b0c7;
+  --ok: #248a3d;
+  --warn: #b25000;
+  --bad: #d70015;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.06);
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --font-data: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --line: rgba(84, 84, 88, 0.55);
+    --fg: #f5f5f7; --fg-dim: #98989d; --accent: #0a84ff; --accent-ink: #ffffff; --accent-soft: rgba(10, 132, 255, 0.2);
+    --seg-thumb: #636366; --card-c: #aeaeb2; --tooth-c: #ff9f0a; --ref-c: #64d2ff;
+    --ok: #30d158; --warn: #ff9f0a; --bad: #ff453a; --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --line: rgba(84, 84, 88, 0.55);
+  --fg: #f5f5f7; --fg-dim: #98989d; --accent: #0a84ff; --accent-ink: #ffffff; --accent-soft: rgba(10, 132, 255, 0.2);
+  --seg-thumb: #636366; --card-c: #aeaeb2; --tooth-c: #ff9f0a; --ref-c: #64d2ff;
+  --ok: #30d158; --warn: #ff9f0a; --bad: #ff453a; --shadow: none;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.47 var(--font-body); -webkit-font-smoothing: antialiased;
+  padding-block: 40px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1160px; margin: 0 auto; display: grid; gap: 24px; }
+header h1 { font: 700 40px/1.08 var(--font-display); letter-spacing: -0.022em; margin: 0 0 10px; text-wrap: balance; }
+header p { margin: 0; color: var(--fg-dim); font-size: 17px; line-height: 1.47; max-width: 56ch; }
+.example-banner {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 14px; color: var(--fg);
+  background: var(--accent-soft); font-size: 14px;
+}
+.example-banner[hidden] { display: none; }
+.app { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 880px) { .app { grid-template-columns: minmax(0, 1fr); } header h1 { font-size: 34px; } }
+.col { display: grid; gap: 20px; min-width: 0; }
+.panel { background: var(--surface); border-radius: 20px; padding: 22px; min-width: 0; box-shadow: var(--shadow); }
+.panel h2 { font: 600 19px/1.2 var(--font-display); letter-spacing: -0.012em; margin: 0 0 16px; color: var(--fg); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+button, .btn, select, input[type="text"], input[type="number"] {
+  font: inherit; color: var(--fg); background: var(--surface-2); border: 0;
+  border-radius: 10px; padding: 8px 14px; min-height: 40px;
+}
+button, .btn {
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--accent-soft); color: var(--accent); font-weight: 500; border-radius: 980px; padding: 8px 18px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+button:hover, .btn:hover { opacity: 0.82; }
+button:active, .btn:active { transform: scale(0.98); }
+button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visible, canvas:focus-visible, summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px;
+}
+button.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg { display: flex; gap: 2px; padding: 2px; margin-bottom: 14px; background: var(--surface-2); border-radius: 11px; }
+.seg button {
+  flex: 1 1 0; min-width: 0; background: transparent; color: var(--fg); border-radius: 9px; padding: 7px 8px;
+  font-size: 14px; font-weight: 500; min-height: 34px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seg button[aria-pressed="true"] { background: var(--seg-thumb); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04); font-weight: 600; }
+.seg button:hover { opacity: 1; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.dot.card { background: var(--card-c); } .dot.tooth { background: var(--tooth-c); } .dot.ref { background: var(--ref-c); }
+.step { font-size: 12px; color: var(--fg-dim); font-weight: 500; }
+.stage { position: relative; background: #000; border-radius: 14px; overflow: hidden; }
+canvas#view { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+.hint { margin: 12px 2px 0; color: var(--fg-dim); font-size: 14px; min-height: 20px; }
+.tips summary { cursor: pointer; font: 600 17px/1.3 var(--font-display); letter-spacing: -0.01em; list-style: none; display: flex; justify-content: space-between; align-items: center; border-radius: 8px; }
+.tips summary::-webkit-details-marker { display: none; }
+.tips summary::after { content: "›"; font-size: 24px; color: var(--fg-dim); transition: transform 0.2s ease; }
+.tips details[open] summary::after { transform: rotate(90deg); }
+.tips ul { margin: 12px 0 0; padding-left: 18px; color: var(--fg-dim); font-size: 15px; }
+.tips li { margin: 5px 0; }
+
+.swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sw { border-radius: 14px; overflow: hidden; background: var(--surface-2); }
+.sw .chip { height: 96px; background: var(--surface-2); }
+.sw .cap { padding: 8px 12px; font-size: 13px; color: var(--fg-dim); display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.sw .cap b { color: var(--fg); font-family: var(--font-data); font-weight: 500; font-size: 12px; }
+.de-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 20px 0 10px; }
+.de-num { font: 600 60px/1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.de-unit { color: var(--fg-dim); font-size: 15px; font-weight: 500; }
+.pill { padding: 4px 12px; border-radius: 99px; font-size: 13px; font-weight: 600; background: color-mix(in srgb, currentColor 14%, transparent); }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); } .pill.none { color: var(--fg-dim); }
+.scale { position: relative; height: 6px; background: var(--surface-2); border-radius: 3px; margin: 8px 0 26px; }
+.scale .fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--fg-dim); }
+.scale .fill.ok { background: var(--ok); } .scale .fill.warn { background: var(--warn); } .scale .fill.bad { background: var(--bad); }
+.scale .tick { position: absolute; top: -3px; bottom: -3px; width: 2px; border-radius: 1px; background: var(--fg); opacity: 0.35; }
+.scale .tick span { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font: 12px var(--font-body); color: var(--fg-dim); white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 4px; border-bottom: 0.5px solid var(--line); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+th:first-child, td:first-child { text-align: left; }
+th { font: 500 12px var(--font-body); color: var(--fg-dim); }
+td { font: 15px var(--font-display); }
+td:first-child { color: var(--fg-dim); font-size: 14px; }
+ul.warns { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+ul.warns li { padding: 10px 12px 10px 34px; position: relative; background: var(--surface-2); font-size: 14px; border-radius: 12px; }
+ul.warns li::before { content: ""; position: absolute; left: 14px; top: 17px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+ul.warns li.good::before { background: var(--ok); }
+.mono { font-family: var(--font-data); font-size: 12px; color: var(--fg-dim); }
+.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fields label, .field { display: grid; gap: 6px; font-size: 13px; color: var(--fg-dim); }
+.fields input, .field input, .field select { width: 100%; color: var(--fg); font-size: 16px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.row > * { min-width: 0; }
+input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 40px; background: transparent; padding: 0; }
+input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; }
+input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.note { color: var(--fg-dim); font-size: 13px; line-height: 1.45; margin: 12px 0 0; }
+textarea#csvBox { width: 100%; min-height: 92px; font: 12px/1.45 var(--font-data); color: var(--fg); background: var(--surface-2); border: 0; border-radius: 12px; padding: 12px; resize: vertical; margin-top: 12px; }
+figure.report { margin: 16px 0 0; }
+figure.report img { width: 100%; max-width: 420px; height: auto; border-radius: 12px; display: block; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12); }
+figure.report figcaption { color: var(--fg-dim); font-size: 13px; margin-top: 8px; }
+.empty { color: var(--fg-dim); font-size: 14px; margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .scale .fill { transition: width 0.3s ease; } }
+@media (prefers-reduced-motion: reduce) { button, .btn, .tips summary::after { transition: none; } }
+
+.banner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px; border-radius: 14px; background: var(--accent-soft); font-size: 14px; }
+.fields.lab3 { grid-template-columns: repeat(3, minmax(0, 1fr)) 44px; margin-top: 14px; align-items: end; }
+.fields.lab3.cal { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
+.fields.lab3.cal .lbl { grid-column: 1 / -1; font: 600 12px var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-dim); margin-top: 4px; }
+.fields.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 14px; align-items: end; }
+.fields.two label { align-content: end; }
+.fields.one { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 520px) { .fields.two { grid-template-columns: minmax(0, 1fr); } }
+.chip-s { height: 44px; border-radius: 10px; border: 0.5px solid var(--line); background: var(--surface-2); }
+.fields label b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.field { margin: 0; }
+#tpOut { background: var(--surface-2); }
+.app { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+@media (max-width: 880px) { .app { grid-template-columns: minmax(0, 1fr); } }
+.calbox { margin-top: 16px; }
+.calbox summary { cursor: pointer; font-weight: 600; font-size: 15px; padding: 6px 0; }
+.calnote { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); font-size: 14px; display: grid; gap: 8px; }
+.calnote[hidden] { display: none; }
+.deltatxt { margin: 6px 0 0; color: var(--fg-dim); font-size: 14px; }
+.mouth { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.mouth figure { margin: 0; text-align: center; font-size: 13px; color: var(--fg-dim); background: #c7766f; border-radius: 14px; padding: 14px 8px 8px; }
+.mouth svg { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto 6px; }
+.mouth figcaption { color: #fff; opacity: 0.95; }
+#layers svg, #chart svg { width: 100%; height: auto; display: block; }
+#chart text, #layers text { font: 12px var(--font-body); fill: var(--fg-dim); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--fg-dim); margin: 6px 0 10px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+table td.num, table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+figure.report img { max-width: 100%; }
+.sw .chip { height: 84px; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Simulador de Cor por Camadas</h1>
+    <p>Estime a cor final de uma lente de contato dental ou laminado a partir da cor do preparo, do cimento e da espessura e translucidez da cerâmica. Compare com a cor desejada e veja qual espessura e qual cimento aproximam o resultado.</p>
+  </header>
+
+  <div class="banner" role="note"><span><strong>Tudo roda no seu navegador.</strong> Os valores iniciais de cor e translucidez são ilustrativos. Para um caso real, use cores medidas do preparo (por exemplo, com o Colorímetro por Foto) e dados do seu material. O resultado é uma estimativa de estudo e não substitui a prova com o cimento de prova (try-in) nem a avaliação clínica.</span></div>
+
+  <div class="app">
+    <div class="col">
+      <section class="panel" aria-labelledby="h-sub">
+        <h2 id="h-sub">1. Preparo (substrato)</h2>
+        <div class="field"><label for="subPre">Situação do dente</label><select id="subPre"></select></div>
+        <div class="fields lab3">
+          <label for="subL">L*<input id="subL" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="subA">a*<input id="subA" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="subB">b*<input id="subB" type="text" inputmode="decimal" autocomplete="off"></label>
+          <span class="chip-s" id="subChip" aria-hidden="true"></span>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-cem">
+        <h2 id="h-cem">2. Cimento</h2>
+        <div class="field"><label for="cemPre">Tipo de cimento</label><select id="cemPre"></select></div>
+        <div class="fields lab3">
+          <label for="cemL">L*<input id="cemL" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="cemA">a*<input id="cemA" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="cemB">b*<input id="cemB" type="text" inputmode="decimal" autocomplete="off"></label>
+          <span class="chip-s" id="cemChip" aria-hidden="true"></span>
+        </div>
+        <div class="fields two">
+          <label for="cemS">Espalhamento (S, por mm)<input id="cemS" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="cemX">Espessura da película: <b id="cemXv"></b><input id="cemX" type="range" min="0.03" max="0.30" step="0.01"></label>
+        </div>
+        <p class="note">L*a*b* é a cor do cimento visto em espessura grossa. Maior S significa cimento mais opaco. Cimentos opacos costumam ser mais claros e podem desviar o tom, por isso o resultado muda conforme a cor escolhida.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-cer">
+        <h2 id="h-cer">3. Cerâmica</h2>
+        <div id="cerManual">
+          <div class="field"><label for="cerPre">Cor da cerâmica</label><select id="cerPre"></select></div>
+          <div class="fields lab3">
+            <label for="cerL">L*<input id="cerL" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="cerA">a*<input id="cerA" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="cerB">b*<input id="cerB" type="text" inputmode="decimal" autocomplete="off"></label>
+            <span class="chip-s" id="cerChip" aria-hidden="true"></span>
+          </div>
+          <div class="field" style="margin-top:14px"><label for="trPre">Translucidez</label><select id="trPre"></select></div>
+          <div class="fields two">
+            <label for="cerS">Espalhamento (S, por mm)<input id="cerS" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="tpOut">Translucidez em 1 mm (TP, ΔE00)<input id="tpOut" type="text" readonly></label>
+          </div>
+        </div>
+        <div class="calnote" id="calNote" hidden><b>Cerâmica calibrada com suas medidas.</b> <span id="calTxt"></span> <button type="button" id="btnCalOff">Voltar aos valores manuais</button></div>
+        <div class="fields one" style="margin-top:14px">
+          <label for="cerX">Espessura da cerâmica: <b id="cerXv"></b><input id="cerX" type="range" min="0.2" max="2" step="0.05"></label>
+        </div>
+        <details class="calbox"><summary>Calibrar com medidas do seu material</summary>
+          <p class="note">Meça uma amostra da cerâmica, com espessura conhecida, sobre fundo preto e sobre fundo branco. Informe L*a*b* de cada medida. Isso substitui a cor e a translucidez manuais.</p>
+          <div class="fields lab3 cal">
+            <span class="lbl">Sobre fundo preto</span>
+            <label for="cbL">L*<input id="cbL" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="cbA">a*<input id="cbA" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="cbB">b*<input id="cbB" type="text" inputmode="decimal" autocomplete="off"></label>
+            <span class="lbl">Sobre fundo branco</span>
+            <label for="cwL">L*<input id="cwL" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="cwA">a*<input id="cwA" type="text" inputmode="decimal" autocomplete="off"></label>
+            <label for="cwB">b*<input id="cwB" type="text" inputmode="decimal" autocomplete="off"></label>
+          </div>
+          <div class="fields two" style="margin-top:12px">
+            <label for="cx0">Espessura da amostra, em mm<input id="cx0" type="text" inputmode="decimal" autocomplete="off" value="1"></label>
+            <label for="cwBk">L* do fundo branco usado<input id="cwBk" type="text" inputmode="decimal" autocomplete="off" value="93"></label>
+          </div>
+          <div class="btnrow" style="margin-top:12px"><button type="button" id="btnCal" class="primary">Calcular e usar</button></div>
+          <p class="note" id="calMsg" role="status"></p>
+        </details>
+      </section>
+
+      <section class="panel" aria-labelledby="h-tgt">
+        <h2 id="h-tgt">4. Cor desejada</h2>
+        <div class="field"><label for="tgtPre">Alvo</label><select id="tgtPre"></select></div>
+        <div class="fields lab3">
+          <label for="tgtL">L*<input id="tgtL" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="tgtA">a*<input id="tgtA" type="text" inputmode="decimal" autocomplete="off"></label>
+          <label for="tgtB">b*<input id="tgtB" type="text" inputmode="decimal" autocomplete="off"></label>
+          <span class="chip-s" id="tgtChip" aria-hidden="true"></span>
+        </div>
+        <p class="note">Costuma ser a cor dos dentes vizinhos ou a escolhida com o paciente.</p>
+      </section>
+    </div>
+
+    <div class="col sticky">
+      <section class="panel" aria-labelledby="h-res">
+        <h2 id="h-res">Resultado</h2>
+        <div class="swatches" id="swatches"></div>
+        <div class="de-row"><span class="de-num" id="deNum">-</span><span class="de-unit">ΔE00 entre final e desejada</span><span class="pill none" id="dePill">-</span></div>
+        <div class="scale" id="deScale" aria-hidden="true"><div class="fill" id="deFill"></div><div class="tick" style="left:20%"><span>0,8</span></div><div class="tick" style="left:45%"><span>1,8</span></div></div>
+        <p id="deltaTxt" class="deltatxt"></p>
+        <ul class="warns" id="warns"></ul>
+        <div class="mouth" id="mouth" aria-label="Comparação entre a cor desejada e a cor final"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-lay">
+        <h2 id="h-lay">Camadas</h2>
+        <div id="layers"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-gra">
+        <h2 id="h-gra">Espessura da cerâmica e cimento</h2>
+        <p class="note" style="margin-top:-6px">ΔE00 entre a cor final e a desejada, para cada tipo de cimento, conforme a espessura da cerâmica. A película de cimento usa a espessura definida acima.</p>
+        <div id="chart"></div>
+        <div class="tablewrap"><table id="cemTab"></table></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-rel">
+        <h2 id="h-rel">Relatório</h2>
+        <div class="btnrow">
+          <button type="button" id="btnPng" hidden>Baixar PNG</button>
+          <button type="button" id="btnCopy">Copiar resumo</button>
+        </div>
+        <textarea id="csvBox" hidden readonly></textarea>
+        <figure class="report"><img id="repImg" alt="Relatório do simulador de cor por camadas"><figcaption>Imagem do relatório com os parâmetros e o resultado.</figcaption></figure>
+      </section>
+
+      <section class="panel tips">
+        <details><summary>Como o cálculo funciona e limites</summary>
+          <ul>
+            <li>Cada camada é tratada pelo modelo de Kubelka e Munk, em três bandas (vermelho, verde e azul, em sRGB linear). A luz que atravessa a cerâmica é refletida pelo cimento e pelo preparo e volta através da cerâmica.</li>
+            <li>Cada camada é descrita por uma cor em espessura grossa (a cor própria do material) e por um coeficiente de espalhamento S por mm. Quanto menor o S, mais translúcida a camada.</li>
+            <li>A translucidez em 1 mm (TP) é a diferença de cor, em ΔE00, da cerâmica sobre fundo branco e sobre fundo preto, no estilo de Johnston e colaboradores. Os presets HT, MT, LT e MO usam valores de S que dão TP de cerca de 20, 16, 12 e 8 em 1 mm. São números ilustrativos, não dados de um fabricante.</li>
+            <li>Limites do modelo: três bandas no lugar de espectro completo, sem brilho de superfície, fluorescência, opalescência nem textura. Cimento e cerâmica reais variam com o lote, a queima e o glaze.</li>
+            <li>Limiares de ΔE00: 0,8 para imperceptível e 1,8 para aceitável (Paravina e colaboradores, 2015).</li>
+            <li>Use o resultado para comparar cenários, como cimento translúcido contra opaco ou 0,5 contra 0,8 mm. A decisão final depende da prova com o cimento de prova e do julgamento clínico.</li>
+          </ul>
+          <p class="note">Kubelka P, Munk F. Z Tech Phys 1931;12:593-601. Johnston WM, Ma T, Kienle BH. Int J Prosthodont 1995;8:79-86. Paravina RD et al. J Esthet Restor Dent 2015;27(S1):S1-S9.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+"use strict";
+// ---------- Núcleo de cor e modelo de camadas (Kubelka-Munk em 3 bandas, sRGB linear) ----------
+var M = [[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750], [0.0193339, 0.1191920, 0.9503041]];
+var WHITE = [0.95047, 1.0, 1.08883];
+var P_T = 0.8, A_T = 1.8; // Paravina et al. 2015, CIEDE2000
+var EPS = 216 / 24389, KAP = 24389 / 27;
+function clamp(x, lo, hi) { return Math.min(hi, Math.max(lo, x)); }
+function s2l(c) { c = c / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function l2s(x) { x = clamp(x, 0, 1); var c = x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055; return Math.round(c * 255); }
+function fLab(t) { return t > EPS ? Math.cbrt(t) : (KAP * t + 16) / 116; }
+function lin2lab(r, g, b) {
+  var x = (M[0][0] * r + M[0][1] * g + M[0][2] * b) / WHITE[0];
+  var y = (M[1][0] * r + M[1][1] * g + M[1][2] * b) / WHITE[1];
+  var z = (M[2][0] * r + M[2][1] * g + M[2][2] * b) / WHITE[2];
+  var fx = fLab(x), fy = fLab(y), fz = fLab(z);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function lab2lin(L, a, b) {
+  var fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+  var xr = fx * fx * fx > EPS ? fx * fx * fx : (116 * fx - 16) / KAP;
+  var yr = L > KAP * EPS ? Math.pow((L + 16) / 116, 3) : L / KAP;
+  var zr = fz * fz * fz > EPS ? fz * fz * fz : (116 * fz - 16) / KAP;
+  var X = xr * WHITE[0], Y = yr * WHITE[1], Z = zr * WHITE[2];
+  return [3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z, -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z, 0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z];
+}
+function lab2rgb8(lab) { var l = lab2lin(lab[0], lab[1], lab[2]); return [l2s(l[0]), l2s(l[1]), l2s(l[2])]; }
+function hexOf(rgb) { return "#" + rgb.map(function (v) { return ("0" + v.toString(16)).slice(-2); }).join("").toUpperCase(); }
+function dE00(l1, l2) {
+  var rad = Math.PI / 180, deg = 180 / Math.PI;
+  var L1 = l1[0], a1 = l1[1], b1 = l1[2], L2 = l2[0], a2 = l2[1], b2 = l2[2];
+  var C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2), Cb = (C1 + C2) / 2;
+  var G = 0.5 * (1 - Math.sqrt(Math.pow(Cb, 7) / (Math.pow(Cb, 7) + Math.pow(25, 7))));
+  var a1p = (1 + G) * a1, a2p = (1 + G) * a2;
+  var C1p = Math.hypot(a1p, b1), C2p = Math.hypot(a2p, b2);
+  function hue(ap, b) { if (ap === 0 && b === 0) return 0; var h = Math.atan2(b, ap) * deg; return h < 0 ? h + 360 : h; }
+  var h1p = hue(a1p, b1), h2p = hue(a2p, b2);
+  var dLp = L2 - L1, dCp = C2p - C1p, dhp;
+  if (C1p * C2p === 0) dhp = 0; else { var d = h2p - h1p; if (d > 180) d -= 360; else if (d < -180) d += 360; dhp = d; }
+  var dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin(dhp * rad / 2);
+  var Lbp = (L1 + L2) / 2, Cbp = (C1p + C2p) / 2, hbp;
+  if (C1p * C2p === 0) hbp = h1p + h2p;
+  else if (Math.abs(h1p - h2p) <= 180) hbp = (h1p + h2p) / 2;
+  else if (h1p + h2p < 360) hbp = (h1p + h2p + 360) / 2;
+  else hbp = (h1p + h2p - 360) / 2;
+  var T = 1 - 0.17 * Math.cos((hbp - 30) * rad) + 0.24 * Math.cos(2 * hbp * rad) + 0.32 * Math.cos((3 * hbp + 6) * rad) - 0.20 * Math.cos((4 * hbp - 63) * rad);
+  var dTh = 30 * Math.exp(-Math.pow((hbp - 275) / 25, 2));
+  var Rc = 2 * Math.sqrt(Math.pow(Cbp, 7) / (Math.pow(Cbp, 7) + Math.pow(25, 7)));
+  var Sl = 1 + (0.015 * Math.pow(Lbp - 50, 2)) / Math.sqrt(20 + Math.pow(Lbp - 50, 2));
+  var Sc = 1 + 0.045 * Cbp, Sh = 1 + 0.015 * Cbp * T;
+  var Rt = -Math.sin(2 * dTh * rad) * Rc;
+  var tl = dLp / Sl, tc = dCp / Sc, th = dHp / Sh;
+  return Math.sqrt(tl * tl + tc * tc + th * th + Rt * tc * th);
+}
+function classify(de) {
+  if (de <= P_T) return { cls: "ok", text: "Imperceptível" };
+  if (de <= A_T) return { cls: "warn", text: "Perceptível, aceitável" };
+  return { cls: "bad", text: "Acima do limiar de aceitabilidade" };
+}
+
+// Kubelka-Munk, uma banda. rinf: refletância de espessura infinita; S: espalhamento por mm; x: espessura em mm; rg: fundo.
+var RMIN = 0.002, RMAX = 0.98;
+function kmLayer(rinf, S, x, rg) {
+  rinf = clamp(rinf, RMIN, RMAX);
+  if (x <= 0 || S <= 0) return rg;
+  var ks = (1 - rinf) * (1 - rinf) / (2 * rinf);
+  var a = 1 + ks, b = Math.sqrt(Math.max(a * a - 1, 1e-12));
+  var t = Math.tanh(b * S * x);
+  var cth = 1 / Math.max(t, 1e-9);
+  return (1 - rg * (a - b * cth)) / (a - rg + b * cth);
+}
+// Camada definida por cor opaca (Lab) e espalhamento S (por mm, igual nas 3 bandas ou vetor de 3).
+function layerFromLab(lab, S) {
+  var l = lab2lin(lab[0], lab[1], lab[2]).map(function (v) { return clamp(v, RMIN, RMAX); });
+  var Sv = Array.isArray(S) ? S : [S, S, S];
+  return { rinf: l, S: Sv };
+}
+function applyLayer(layer, x, rgv) { return [0, 1, 2].map(function (i) { return kmLayer(layer.rinf[i], layer.S[i], x, rgv[i]); }); }
+function labOfLin(v) { return lin2lab(clamp(v[0], 0, 1), clamp(v[1], 0, 1), clamp(v[2], 0, 1)); }
+// Pilha: substrato (opaco, Lab) -> cimento -> cerâmica. Devolve refletâncias lineares e Lab de cada nível.
+function simulate(p) {
+  var sub = lab2lin(p.sub[0], p.sub[1], p.sub[2]).map(function (v) { return clamp(v, RMIN, RMAX); });
+  var cem = layerFromLab(p.cemLab, p.cemS), cer = p.ceramic;
+  var afterCem = applyLayer(cem, p.cemX, sub);
+  var fin = applyLayer(cer, p.cerX, afterCem);
+  return { sub: sub, afterCem: afterCem, fin: fin, finLab: labOfLin(fin), afterCemLab: labOfLin(afterCem) };
+}
+// Translucidez (Johnston): ΔE00 entre cerâmica sobre fundo branco e sobre fundo preto, espessura x.
+function tp(layer, x, wL) {
+  var w = lab2lin(wL, 0, 0), k = [0.0005, 0.0005, 0.0005];
+  var rw = applyLayer(layer, x, w), rb = applyLayer(layer, x, k);
+  return dE00(labOfLin(rw), labOfLin(rb));
+}
+// Calibração a partir de medidas: cor sobre fundo preto (Rg ~ 0) e sobre fundo branco (Rg conhecido), espessura x0.
+function calibrate(labBlack, labWhite, x0, whiteL) {
+  var r0 = lab2lin(labBlack[0], labBlack[1], labBlack[2]).map(function (v) { return clamp(v, RMIN, RMAX); });
+  var rw = lab2lin(labWhite[0], labWhite[1], labWhite[2]).map(function (v) { return clamp(v, RMIN, RMAX); });
+  var rgw = clamp(lab2lin(whiteL, 0, 0)[1], 0.05, 1);
+  var rinf = [], S = [], bad = false;
+  for (var i = 0; i < 3; i++) {
+    var R0 = r0[i], R = rw[i];
+    if (R <= R0 * 1.0005) { bad = true; R = R0 * 1.0005 + 1e-6; }
+    var a = 0.5 * (R + (R0 - R + rgw) / (R0 * rgw));
+    if (!(a > 1)) { a = 1.0005; bad = true; }
+    var b = Math.sqrt(a * a - 1);
+    var c = (1 - a * R0) / (b * R0);
+    var sx;
+    if (c <= 1.0000001) { sx = 8; bad = true; } else sx = 0.5 * Math.log((c + 1) / (c - 1)) / b; // arccoth
+    rinf.push(clamp(a - b, RMIN, RMAX));
+    S.push(Math.max(sx / x0, 0.05));
+  }
+  return { rinf: rinf, S: S, warn: bad };
+}
+
+// ---------- Interface ----------
+var CAN_DOWNLOAD = true;
+function $(id) { return document.getElementById(id); }
+function fmt(n, d) { return (isNaN(n) ? 0 : n).toFixed(d === undefined ? 1 : d).replace('.', ','); }
+function parseNum(s) { var v = parseFloat(String(s).trim().replace(',', '.')); return isNaN(v) ? null : v; }
+function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
+
+var SUB_PRESETS = [
+  { n: 'Dentina clara', lab: [74, 1.5, 17] }, { n: 'Dentina média', lab: [68, 3, 22] },
+  { n: 'Dentina escurecida', lab: [58, 4, 20] }, { n: 'Dentina muito escura', lab: [48, 4, 14] },
+  { n: 'Núcleo metálico (cinza)', lab: [45, 0, 0] }, { n: 'Personalizado', lab: null }
+];
+var CEM_PRESETS = [
+  { n: 'Translúcido', lab: [80, -0.5, 7], S: 2.5 }, { n: 'Intermediário', lab: [82, 0, 9], S: 6 },
+  { n: 'Opaco (bloqueador)', lab: [86, -1, 5], S: 14 }, { n: 'Personalizado', lab: null }
+];
+var COL_PRESETS = [
+  { n: 'Muito clara (clareada)', lab: [86, -1, 4] }, { n: 'Clara', lab: [82, -0.5, 9] },
+  { n: 'Média', lab: [77, 0.5, 14] }, { n: 'Mais escura e saturada', lab: [72, 2, 20] }, { n: 'Personalizada', lab: null }
+];
+var TR_PRESETS = [
+  { n: 'HT (alta translucidez)', S: 0.463 }, { n: 'MT (média)', S: 0.607 }, { n: 'LT (baixa)', S: 0.816 },
+  { n: 'MO (opaca)', S: 1.143 }, { n: 'Personalizada', S: null }
+];
+var ST = { cal: null };
+var lastRep = null;
+
+function fillSelect(id, arr, sel) {
+  var s = $(id); arr.forEach(function (p, i) { var o = document.createElement('option'); o.value = i; o.textContent = p.n; s.appendChild(o); }); s.value = sel;
+}
+function setLab(prefix, lab) { $(prefix + 'L').value = fmt(lab[0], 1); $(prefix + 'A').value = fmt(lab[1], 1); $(prefix + 'B').value = fmt(lab[2], 1); }
+function readLab(prefix) {
+  var L = parseNum($(prefix + 'L').value), a = parseNum($(prefix + 'A').value), b = parseNum($(prefix + 'B').value);
+  if (L === null || a === null || b === null) return null;
+  if (L < 0 || L > 100 || a < -128 || a > 127 || b < -128 || b > 127) return null;
+  return [L, a, b];
+}
+function paintChip(id, lab) { $(id).style.background = lab ? hexOf(lab2rgb8(lab)) : ''; }
+function setPresetCustom(selId, arr) { $(selId).value = arr.length - 1; }
+
+function readState() {
+  var o = { sub: readLab('sub'), cemLab: readLab('cem'), tgt: readLab('tgt'), cemS: parseNum($('cemS').value), cemX: parseFloat($('cemX').value), cerX: parseFloat($('cerX').value) };
+  var bad = !o.sub || !o.cemLab || !o.tgt || o.cemS === null || o.cemS <= 0;
+  if (ST.cal) o.ceramic = { rinf: ST.cal.rinf, S: ST.cal.S, lab: null };
+  else {
+    var cl = readLab('cer'), cs = parseNum($('cerS').value);
+    if (!cl || cs === null || cs <= 0) bad = true; else { o.ceramic = layerFromLab(cl, cs); o.ceramic.lab = cl; }
+  }
+  return bad ? null : o;
+}
+function simAt(o, cerX, cemPreset) {
+  return simulate({ sub: o.sub, cemLab: cemPreset ? cemPreset.lab : o.cemLab, cemS: cemPreset ? cemPreset.S : o.cemS, cemX: o.cemX, ceramic: o.ceramic, cerX: cerX });
+}
+function describeDelta(f, t) {
+  var dL = f[0] - t[0], da = f[1] - t[1], db = f[2] - t[2], parts = [];
+  if (Math.abs(dL) >= 0.5) parts.push(dL < 0 ? 'mais escura' : 'mais clara');
+  if (Math.abs(db) >= 1) parts.push(db > 0 ? 'mais amarelada' : 'menos amarelada');
+  if (Math.abs(da) >= 1) parts.push(da > 0 ? 'mais avermelhada' : 'mais esverdeada');
+  var txt = parts.length ? 'A cor final fica ' + parts.join(', ') + ' que a desejada.' : 'A cor final é muito próxima da desejada em luminosidade e tom.';
+  return txt + ' (ΔL* ' + fmt(dL, 1) + ', Δa* ' + fmt(da, 1) + ', Δb* ' + fmt(db, 1) + ')';
+}
+function minThickness(o, preset, thr) {
+  for (var x = 0.2; x <= 2.0001; x += 0.05) { var s = simAt(o, x, preset); if (dE00(s.finLab, o.tgt) <= thr) return x; }
+  return null;
+}
+function toothSvg(hex) {
+  return '<svg viewBox="0 0 100 130" aria-hidden="true"><defs><linearGradient id="g' + hex.slice(1) + '" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0.10"/><stop offset="0.35" stop-color="#fff" stop-opacity="0.18"/><stop offset="1" stop-color="#000" stop-opacity="0.14"/></linearGradient></defs>' +
+    '<path d="M22 12 Q50 0 78 12 Q90 62 77 116 Q50 130 23 116 Q10 62 22 12 Z" fill="' + hex + '" stroke="rgba(0,0,0,0.25)" stroke-width="1"/>' +
+    '<path d="M22 12 Q50 0 78 12 Q90 62 77 116 Q50 130 23 116 Q10 62 22 12 Z" fill="url(#g' + hex.slice(1) + ')"/></svg>';
+}
+function layersSvg(o, sim) {
+  var cerH = clamp(o.cerX * 90, 16, 160), cemH = clamp(o.cemX * 90, 5, 40), subH = 70, top = 10, x0 = 10, w = 150;
+  var cerHex = hexOf(lab2rgb8(sim.finLab)), cemHex = hexOf(lab2rgb8(sim.afterCemLab)), subHex = hexOf(lab2rgb8(o.sub));
+  var y1 = top + cerH / 2, y2 = Math.max(y1 + 44, top + cerH + cemH / 2), y3 = Math.max(y2 + 44, top + cerH + cemH + subH / 2);
+  var H = Math.max(top + cerH + cemH + subH + 10, y3 + 40);
+  var s = '<svg viewBox="0 0 420 ' + H + '" role="img" aria-label="Corte esquemático: cerâmica, cimento e preparo">';
+  s += '<rect x="' + x0 + '" y="' + top + '" width="' + w + '" height="' + cerH + '" rx="6" fill="' + cerHex + '" stroke="rgba(0,0,0,0.25)"/>';
+  s += '<rect x="' + x0 + '" y="' + (top + cerH) + '" width="' + w + '" height="' + cemH + '" fill="' + cemHex + '" stroke="rgba(0,0,0,0.25)"/>';
+  s += '<rect x="' + x0 + '" y="' + (top + cerH + cemH) + '" width="' + w + '" height="' + subH + '" rx="6" fill="' + subHex + '" stroke="rgba(0,0,0,0.25)"/>';
+  var lx = x0 + w + 16;
+  function lab(yc, ym, t1, t2) {
+    return '<line x1="' + (x0 + w) + '" y1="' + ym + '" x2="' + (lx - 4) + '" y2="' + yc + '" stroke="var(--line)"/><text x="' + lx + '" y="' + (yc - 1) + '" style="fill:var(--fg)">' + t1 + '</text><text x="' + lx + '" y="' + (yc + 15) + '">' + t2 + '</text>';
+  }
+  s += lab(y1, top + cerH / 2, 'Cerâmica, ' + fmt(o.cerX, 2) + ' mm', 'cor final ' + cerHex);
+  s += lab(y2, top + cerH + cemH / 2, 'Cimento, ' + fmt(o.cemX, 2) + ' mm', 'sobre o preparo ' + cemHex);
+  s += lab(y3, top + cerH + cemH + subH / 2, 'Preparo', subHex);
+  return s + '</svg>';
+}
+function chartSvg(o, curves) {
+  var W = 560, Hh = 262, ml = 44, mr = 12, mt = 12, mb = 46, ymax = 4;
+  curves.forEach(function (c) { c.pts.forEach(function (p) { if (p[1] > ymax) ymax = p[1]; }); }); ymax = Math.min(10, Math.ceil(ymax));
+  function X(x) { return ml + (x - 0.2) / 1.8 * (W - ml - mr); }
+  function Y(y) { return mt + (1 - Math.min(y, ymax) / ymax) * (Hh - mt - mb); }
+  var s = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" role="img" aria-label="Gráfico de ΔE00 contra a espessura da cerâmica">';
+  s += '<rect x="' + ml + '" y="' + Y(1.8) + '" width="' + (W - ml - mr) + '" height="' + (Y(0) - Y(1.8)) + '" fill="var(--ok)" opacity="0.08"/>';
+  for (var yy = 0; yy <= ymax; yy += (ymax > 6 ? 2 : 1)) s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(yy) + '" y2="' + Y(yy) + '" stroke="var(--line)"/><text x="' + (ml - 8) + '" y="' + (Y(yy) + 4) + '" text-anchor="end">' + yy + '</text>';
+  [0.8, 1.8].forEach(function (t) { s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="var(--ok)" stroke-dasharray="4 4"/><text x="' + (W - mr - 2) + '" y="' + (Y(t) - 4) + '" text-anchor="end" style="fill:var(--ok)">' + fmt(t, 1) + '</text>'; });
+  [0.2, 0.5, 1.0, 1.5, 2.0].forEach(function (x) { s += '<text x="' + X(x) + '" y="' + (Hh - 26) + '" text-anchor="middle">' + fmt(x, 1) + '</text>'; });
+  s += '<text x="' + (ml + (W - ml - mr) / 2) + '" y="' + (Hh - 4) + '" text-anchor="middle">espessura da cerâmica (mm)</text>';
+  curves.forEach(function (c) { s += '<polyline fill="none" stroke="' + c.color + '" stroke-width="2.2" stroke-linejoin="round" points="' + c.pts.map(function (p) { return fmt(X(p[0]), 1).replace(',', '.') + ',' + fmt(Y(p[1]), 1).replace(',', '.'); }).join(' ') + '"/>'; });
+  return s;
+}
+var CURVE_COLORS = ['var(--accent)', 'var(--warn)', 'var(--ok)'];
+
+function render() {
+  var o = readState(); var err = !o;
+  if (err) { $('warns').innerHTML = ''; var li = el('li', '', 'Há um valor inválido ou vazio. L* vai de 0 a 100, a* e b* de -128 a 127, e S deve ser maior que zero.'); $('warns').appendChild(li); return; }
+  var sim = simAt(o, o.cerX), f = sim.finLab, de = dE00(f, o.tgt), cl = classify(de);
+  // swatches
+  var sw = $('swatches'); sw.innerHTML = '';
+  var cerOpaque = o.ceramic.lab || labOfLin(o.ceramic.rinf);
+  [['Desejada', o.tgt], ['Final simulada', f], ['Preparo', o.sub], ['Cerâmica espessa', cerOpaque]].forEach(function (it) {
+    var d = el('div', 'sw'), c = el('div', 'chip'); c.style.background = hexOf(lab2rgb8(it[1]));
+    var cap = el('div', 'cap'); cap.appendChild(el('span', '', it[0])); cap.appendChild(el('b', '', fmt(it[1][0], 1) + ' ' + fmt(it[1][1], 1) + ' ' + fmt(it[1][2], 1)));
+    d.appendChild(c); d.appendChild(cap); sw.appendChild(d);
+  });
+  $('deNum').textContent = fmt(de, 2); var p = $('dePill'); p.textContent = cl.text; p.className = 'pill ' + cl.cls;
+  var fill = $('deFill'); fill.style.width = clamp(de / 4, 0.02, 1) * 100 + '%'; fill.className = 'fill ' + cl.cls;
+  $('deltaTxt').textContent = describeDelta(f, o.tgt);
+  // avisos
+  var w = $('warns'); w.innerHTML = '';
+  var tpNow = tp(o.ceramic, o.cerX, 93), subDE = dE00(o.sub, o.tgt);
+  function add(t, good) { var l = el('li', good ? 'good' : '', t); w.appendChild(l); }
+  if (de <= A_T) add('Com estes parâmetros a cor final fica dentro do limiar de aceitabilidade.', true);
+  else {
+    var m18 = minThickness(o, null, A_T);
+    if (m18 !== null) add('Com este cimento, a cerâmica precisa de cerca de ' + fmt(m18, 2) + ' mm para chegar a ΔE00 de 1,8 ou menos.');
+    else add('Com este cimento e esta cerâmica, nenhuma espessura até 2,0 mm chega a ΔE00 de 1,8. Teste cimento mais opaco, cerâmica mais opaca ou outra cor de cerâmica.');
+  }
+  if (o.cerX < 0.4 && subDE > 3) add('Cerâmica fina sobre preparo bem diferente da cor desejada: a cor do preparo aparece muito. Considere desgaste maior, cimento mais opaco ou cerâmica menos translúcida.');
+  if (tpNow < 1 && o.cerX >= 0.4) add('Nesta espessura a cerâmica quase não deixa passar luz (TP ' + fmt(tpNow, 1) + '). A cor do preparo e do cimento pouco influencia.', true);
+  // boca
+  var tHex = hexOf(lab2rgb8(o.tgt)), fHex = hexOf(lab2rgb8(f));
+  $('mouth').innerHTML = '<figure>' + toothSvg(tHex) + '<figcaption>Desejada</figcaption></figure><figure>' + toothSvg(fHex) + '<figcaption>Final simulada</figcaption></figure>';
+  $('layers').innerHTML = layersSvg(o, sim);
+  // curvas
+  var curves = CEM_PRESETS.slice(0, 3).map(function (cp, i) {
+    var pts = []; for (var x = 0.2; x <= 2.0001; x += 0.05) pts.push([x, dE00(simAt(o, x, cp).finLab, o.tgt)]);
+    return { name: cp.n, color: CURVE_COLORS[i], pts: pts };
+  });
+  var svg = chartSvg(o, curves);
+  var X = function (x) { return 44 + (x - 0.2) / 1.8 * (560 - 44 - 12); };
+  var ymaxG = 4; curves.forEach(function (c) { c.pts.forEach(function (p) { if (p[1] > ymaxG) ymaxG = p[1]; }); }); ymaxG = Math.min(10, Math.ceil(ymaxG));
+  var cy = 12 + (1 - Math.min(de, ymaxG) / ymaxG) * (262 - 12 - 46);
+  svg += '<circle cx="' + X(o.cerX).toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="6" fill="var(--fg)" stroke="var(--surface)" stroke-width="2"/></svg>';
+  var lg = '<div class="legend">' + curves.map(function (c) { return '<span><i style="background:' + c.color + '"></i>' + c.name + '</span>'; }).join('') + '<span>● situação atual</span></div>';
+  $('chart').innerHTML = lg + svg;
+  // tabela
+  var tb = $('cemTab'); tb.innerHTML = '';
+  var hr = el('tr'); ['Cimento', 'ΔE00 agora', 'Mín. p/ ≤ 1,8', 'Mín. p/ ≤ 0,8'].forEach(function (h, i) { var th = el('th', i ? 'num' : '', h); hr.appendChild(th); }); tb.appendChild(hr);
+  var rows = [];
+  CEM_PRESETS.slice(0, 3).forEach(function (cp) {
+    var d = dE00(simAt(o, o.cerX, cp).finLab, o.tgt), m18 = minThickness(o, cp, A_T), m08 = minThickness(o, cp, P_T);
+    rows.push([cp.n, fmt(d, 2), m18 === null ? 'não alcança' : fmt(m18, 2) + ' mm', m08 === null ? 'não alcança' : fmt(m08, 2) + ' mm']);
+  });
+  rows.forEach(function (r) { var tr = el('tr'); r.forEach(function (v, i) { tr.appendChild(el('td', i ? 'num' : '', v)); }); tb.appendChild(tr); });
+  $('tpOut').value = fmt(tp(o.ceramic, 1.0, 93), 1);
+  $('cemXv').textContent = fmt(o.cemX, 2) + ' mm'; $('cerXv').textContent = fmt(o.cerX, 2) + ' mm';
+  paintChip('subChip', o.sub); paintChip('cemChip', o.cemLab); paintChip('tgtChip', o.tgt); paintChip('cerChip', cerOpaque);
+  lastRep = { o: o, f: f, de: de, cl: cl, rows: rows, tpNow: tpNow, desc: describeDelta(f, o.tgt) };
+  buildReport(); buildCsv();
+}
+
+function buildCsv() {
+  var r = lastRep, o = r.o, subN = SUB_PRESETS[$('subPre').value].n, cemN = CEM_PRESETS[$('cemPre').value].n;
+  var cerN = ST.cal ? 'calibrada' : (COL_PRESETS[$('cerPre').value].n + ' / ' + TR_PRESETS[$('trPre').value].n);
+  var lines = [
+    'Simulador de Cor por Camadas',
+    'Preparo: ' + subN + ' (L* ' + fmt(o.sub[0]) + ', a* ' + fmt(o.sub[1]) + ', b* ' + fmt(o.sub[2]) + ')',
+    'Cimento: ' + cemN + ', película ' + fmt(o.cemX, 2) + ' mm, S ' + fmt(o.cemS, 1),
+    'Cerâmica: ' + cerN + ', espessura ' + fmt(o.cerX, 2) + ' mm',
+    'Cor desejada: L* ' + fmt(o.tgt[0]) + ', a* ' + fmt(o.tgt[1]) + ', b* ' + fmt(o.tgt[2]),
+    'Cor final simulada: L* ' + fmt(r.f[0]) + ', a* ' + fmt(r.f[1]) + ', b* ' + fmt(r.f[2]),
+    'ΔE00: ' + fmt(r.de, 2) + ' (' + r.cl.text + ')',
+    'Estimativa de estudo (Kubelka-Munk em 3 bandas). Não substitui a prova com cimento de prova.'
+  ];
+  $('csvBox').value = lines.join('\n');
+}
+
+function buildReport() {
+  var r = lastRep, o = r.o, W = 1100, H = 760, c = document.createElement('canvas'); c.width = W; c.height = H; var g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  var F = '-apple-system, "Helvetica Neue", Arial, sans-serif';
+  g.fillStyle = '#1d1d1f'; g.font = '600 34px ' + F; g.fillText('Simulador de Cor por Camadas', 40, 30 + 34);
+  g.fillStyle = '#6e6e73'; g.font = '18px ' + F; g.fillText('Estimativa de estudo: Kubelka-Munk em 3 bandas. Não substitui a prova com cimento de prova.', 40, 112);
+  function sw(x, y, lab, t) {
+    g.fillStyle = hexOf(lab2rgb8(lab)); g.beginPath(); g.roundRect ? g.roundRect(x, y, 230, 120, 16) : g.rect(x, y, 230, 120); g.fill();
+    g.fillStyle = '#1d1d1f'; g.font = '600 18px ' + F; g.fillText(t, x, y + 150); g.fillStyle = '#6e6e73'; g.font = '15px ' + F;
+    g.fillText('L* ' + fmt(lab[0]) + '  a* ' + fmt(lab[1]) + '  b* ' + fmt(lab[2]), x, y + 172);
+  }
+  sw(40, 150, o.tgt, 'Desejada'); sw(300, 150, r.f, 'Final simulada'); sw(560, 150, o.sub, 'Preparo');
+  var col = r.cl.cls === 'ok' ? '#248a3d' : r.cl.cls === 'warn' ? '#b25000' : '#d70015';
+  g.fillStyle = col; g.font = '600 64px ' + F; g.fillText(fmt(r.de, 2), 810, 215); var fs = 20; do { g.font = '600 ' + fs + 'px ' + F; fs--; } while (g.measureText(r.cl.text).width > 270 && fs > 11); g.fillText(r.cl.text, 810, 252);
+  g.fillStyle = '#6e6e73'; g.font = '16px ' + F; g.fillText('ΔE00 final contra desejada', 810, 280);
+  var subN = SUB_PRESETS[$('subPre').value].n, cemN = CEM_PRESETS[$('cemPre').value].n;
+  var cerN = ST.cal ? 'calibrada com medidas' : COL_PRESETS[$('cerPre').value].n + ', ' + TR_PRESETS[$('trPre').value].n;
+  var y = 400; g.fillStyle = '#1d1d1f'; g.font = '600 22px ' + F; g.fillText('Parâmetros', 40, y);
+  g.font = '18px ' + F; g.fillStyle = '#1d1d1f';
+  [['Preparo', subN], ['Cimento', cemN + ', película ' + fmt(o.cemX, 2) + ' mm, S ' + fmt(o.cemS, 1)], ['Cerâmica', cerN], ['Espessura da cerâmica', fmt(o.cerX, 2) + ' mm'], ['Translucidez (TP, 1 mm)', fmt(tp(o.ceramic, 1.0, 93), 1)]].forEach(function (ro, i) {
+    g.fillStyle = '#6e6e73'; g.fillText(ro[0], 40, y + 38 + i * 32); g.fillStyle = '#1d1d1f'; g.fillText(ro[1], 300, y + 38 + i * 32);
+  });
+  y = 610; g.fillStyle = '#1d1d1f'; g.font = '600 22px ' + F; g.fillText('Leitura', 40, y); g.font = '18px ' + F; g.fillStyle = '#1d1d1f';
+  var words = r.desc.split(' '), line = '', ly = y + 36;
+  words.forEach(function (wd) { var t = line ? line + ' ' + wd : wd; if (g.measureText(t).width > 1020) { g.fillText(line, 40, ly); ly += 28; line = wd; } else line = t; });
+  g.fillText(line, 40, ly);
+  g.fillStyle = '#6e6e73'; g.font = '14px ' + F; g.fillText('Limiares de ΔE00: 0,8 imperceptível, 1,8 aceitável (Paravina et al., 2015).', 40, H - 22);
+  $('repImg').src = c.toDataURL('image/png');
+}
+
+function download(name, url) { var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+
+function wireLab(prefix, selId, arr, afterFn) {
+  ['L', 'A', 'B'].forEach(function (k) { $(prefix + k).addEventListener('input', function () { setPresetCustom(selId, arr); render(); }); });
+}
+function init() {
+  fillSelect('subPre', SUB_PRESETS, 1); fillSelect('cemPre', CEM_PRESETS, 0); fillSelect('cerPre', COL_PRESETS, 2);
+  fillSelect('trPre', TR_PRESETS, 1); fillSelect('tgtPre', COL_PRESETS, 2);
+  setLab('sub', SUB_PRESETS[1].lab); setLab('cem', CEM_PRESETS[0].lab); $('cemS').value = fmt(CEM_PRESETS[0].S, 1);
+  setLab('cer', COL_PRESETS[2].lab); $('cerS').value = fmt(TR_PRESETS[1].S, 2); setLab('tgt', COL_PRESETS[2].lab);
+  $('cemX').value = 0.1; $('cerX').value = 0.5;
+  $('subPre').addEventListener('change', function () { var p = SUB_PRESETS[this.value]; if (p.lab) setLab('sub', p.lab); render(); });
+  $('cemPre').addEventListener('change', function () { var p = CEM_PRESETS[this.value]; if (p.lab) { setLab('cem', p.lab); $('cemS').value = fmt(p.S, 1); } render(); });
+  $('cerPre').addEventListener('change', function () { var p = COL_PRESETS[this.value]; if (p.lab) setLab('cer', p.lab); render(); });
+  $('trPre').addEventListener('change', function () { var p = TR_PRESETS[this.value]; if (p.S !== null) $('cerS').value = fmt(p.S, 2); render(); });
+  $('tgtPre').addEventListener('change', function () { var p = COL_PRESETS[this.value]; if (p.lab) setLab('tgt', p.lab); render(); });
+  wireLab('sub', 'subPre', SUB_PRESETS); wireLab('cer', 'cerPre', COL_PRESETS); wireLab('tgt', 'tgtPre', COL_PRESETS); wireLab('cem', 'cemPre', CEM_PRESETS);
+  $('cemS').addEventListener('input', function () { setPresetCustom('cemPre', CEM_PRESETS); render(); });
+  $('cerS').addEventListener('input', function () { setPresetCustom('trPre', TR_PRESETS); render(); });
+  $('cemX').addEventListener('input', render); $('cerX').addEventListener('input', render);
+  $('btnCal').addEventListener('click', function () {
+    var b = readLab('cb'), w = readLab('cw'), x0 = parseNum($('cx0').value), wb = parseNum($('cwBk').value), m = $('calMsg');
+    if (!b || !w || x0 === null || x0 <= 0 || wb === null || wb < 20 || wb > 100) { m.textContent = 'Preencha L*a*b* das duas medidas, a espessura da amostra e o L* do fundo branco.'; return; }
+    if (w[0] <= b[0]) { m.textContent = 'A medida sobre fundo branco precisa ser mais clara que a medida sobre fundo preto. Confira os valores.'; return; }
+    var c = calibrate(b, w, x0, wb);
+    ST.cal = { rinf: c.rinf, S: c.S };
+    var layer = { rinf: c.rinf, S: c.S }, tpv = tp(layer, 1.0, 93);
+    $('cerManual').hidden = true; $('calNote').hidden = false;
+    $('calTxt').textContent = 'Cor própria L* ' + fmt(labOfLin(c.rinf)[0], 1) + ', TP em 1 mm de ' + fmt(tpv, 1) + '.' + (c.warn ? ' Atenção: as medidas ficaram no limite do modelo, o resultado é menos confiável.' : '');
+    m.textContent = 'Calibração aplicada.'; render();
+  });
+  $('btnCalOff').addEventListener('click', function () { ST.cal = null; $('cerManual').hidden = false; $('calNote').hidden = true; $('calMsg').textContent = ''; render(); });
+  $('btnCopy').addEventListener('click', function () {
+    var ta = $('csvBox'); ta.hidden = false; ta.focus(); ta.select();
+    var done = false; try { done = document.execCommand('copy'); } catch (e) {}
+    $('btnCopy').textContent = done ? 'Copiado' : 'Selecione e copie'; setTimeout(function () { $('btnCopy').textContent = 'Copiar resumo'; }, 2000);
+  });
+  $('btnPng').hidden = !CAN_DOWNLOAD;
+  $('btnPng').addEventListener('click', function () { download('simulador-cor-camadas.png', $('repImg').src); });
+  render();
+  window.__camadas = { simulate: simulate, calibrate: calibrate, tp: tp, dE00: dE00, readState: readState };
+}
+init();
+
+})();
+</script>
+</body>
+</html>
