@@ -1,5 +1,9 @@
 # Simulador de Cor por Camadas (simulador-cor-camadas)
 
+Abrir no navegador: [mborille.github.io/simulador-cor-camadas/simulador-cor-camadas.html](https://mborille.github.io/simulador-cor-camadas/simulador-cor-camadas.html)
+
+Versão arquivada e citável: [DOI 10.6084/m9.figshare.34715211](https://doi.org/10.6084/m9.figshare.34715211)
+
 Estima a cor final de uma lente de contato dental ou laminado cerâmico a partir da cor do preparo, do cimento e da espessura e translucidez da cerâmica, e compara com a cor desejada pelo ΔE00.
 
 ## Arquivos
